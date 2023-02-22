@@ -1,22 +1,23 @@
 # Behavior of surrounding vehicles, together and alone
 from casadi import *
-import numpy
+import numpy as np
 
 class combinedTraffic:
     """
     Methods for all vehicles in the current scenario
     """
-    def __init__(self,vehicles,egoVehicle,N,f_controller, respawnTol = 75, respawnPos = 120):
+    def __init__(self,vehicles,egoVehicle,vx_ref,f_controller, respawnTol = 75, respawnPos = 120):
         self.vehicles = vehicles
         self.egoVehicle = egoVehicle
         self.Nveh = len(vehicles)
-        self.nx,self.N = vehicles[0].getDim()
+        self.nx,self.N, self.nu = vehicles[0].getDim()
         self.N_pred = int(self.N*f_controller)
         self.f_c = f_controller
 
         self.respawnTol = respawnTol            # Position behind ego vehicle when vehicles become respawned
         self.respawnPos = respawnPos
         self.randPxRange = 30
+        self.vx_ref = vx_ref
         self.randVxRange = 3
 
     def setScenario(self,scenario):
@@ -52,7 +53,7 @@ class combinedTraffic:
         return states
 
     def getFeatures(self):
-        features = np.zeros((self.nx+1,self.Nveh))
+        features = np.zeros((self.nx+self.nu+2,self.Nveh))
         for i in range(self.Nveh):
             features[:,i] = np.squeeze(self.vehicles[i].getFeatures())
         return features
@@ -68,6 +69,45 @@ class combinedTraffic:
 
     def getVehicles(self):
         return self.vehicles
+    
+    def reset(self):
+        # Re-initilizes the traffic
+        dangerDist = 35
+        px_list = []
+        lane_list = []
+        i_ph = 0
+        for vehicle in self.vehicles:
+            respawnOk = False
+            while not(respawnOk):
+                i_ph += 1
+                respawnOk = True
+                # Randomize initial state
+                vx = self.vx_ref + np.random.uniform(-25,5)/3.6
+                lane = np.random.randint(3)
+                py = vehicle.laneCenters[lane]
+
+                if (vx < self.vx_ref):
+                    vx = np.maximum(vx,self.vx_ref - 3/3.6)
+                    if lane == 0:
+                        px = np.random.uniform(50,100)
+                    else:
+                        px = np.random.uniform(20,100)
+                else:
+                    if lane == 0:
+                        px = np.random.uniform(-self.respawnTol+5,-60)
+                    else:
+                        px = np.random.uniform(-self.respawnTol+5,-20)
+                
+                # Avoid collisions
+                for otherLane,otherPx in zip(lane_list,px_list):
+                    if otherLane == lane:
+                        if np.abs(otherPx - px) < dangerDist:
+                            respawnOk = False
+            
+            # Append initilized positions
+            lane_list.append(lane)
+            px_list.append(px)
+            vehicle.reInit(px,py,vx)
 
     def tryRespawn(self,egoPx):
         # Respawns vehicles that are "far enough" out of distance
@@ -94,8 +134,7 @@ class combinedTraffic:
                         doRespawn = False
                 
                 if doRespawn == True:
-                    print("Vehicle is respawning")
-                    vehicle.respawn(respawnPx,respawnVx)
+                    vehicle.spawnVeh(respawnPx,respawnVx)
             
 
 class vehicleSUMO:
@@ -119,6 +158,7 @@ class vehicleSUMO:
         self.width = width
         self.length = length
         self.nx = 4
+        self.nu = 2
 
         self.p = self.p0
         self.v = self.v0_x
@@ -218,7 +258,7 @@ class vehicleSUMO:
         self.laneTarget = self.lane
 
     def setLane(self):
-        # Sets Lane defined simply on geometry
+        # Sets Lane
         if self.p[1] > self.laneWidth:
             self.lane = 1
         elif self.p[1] < 0:
@@ -461,7 +501,7 @@ class vehicleSUMO:
 
     def getFeatures(self):
         # Returns current state of the vehicle
-        return np.array(np.append(np.append(np.append(self.p,self.v),self.theta),self.typeEncoding)).transpose()
+        return np.array(np.append(np.append(np.append(np.append(np.append(self.p,self.v),self.theta),self.u[:,0]), self.typeEncoding),self.lane)).transpose()
 
     def getReference(self):
         return np.array(np.append(self.nearP,self.farP)).T
@@ -474,21 +514,30 @@ class vehicleSUMO:
         return self.width, self.length
 
     def getDim(self):
-        return self.nx, self.N
+        return self.nx, self.N, self.nu
 
     def getLane(self):
             return self.lane
 
-    def respawn(self,respawnPx,respawnVx):
+    def spawnVeh(self,respawnPx,respawnVx):
         # Respawns the vehicle at given position and velocity
         self.p[0] = respawnPx
         self.v = self.v + respawnVx
         self.theta = 0
-
         self.nearP = [self.p[0]+self.d_nearP, self.p[1]]
         self.farP = [self.p[0]+self.d_farP, self.p[1]]
         self.theta_n = 0
         self.theta_f = 0
         self.u = np.zeros((2,self.N),dtype= float)
 
-        pass
+    def reInit(self,px,py,v):
+        self.p[0] = px
+        self.p[1] = py
+        self.v = v
+        self.theta = 0
+        self.nearP = [self.p[0]+self.d_nearP, self.p[1]]
+        self.farP = [self.p[0]+self.d_farP, self.p[1]]
+        self.theta_n = 0
+        self.theta_f = 0
+        self.u = np.zeros((2,self.N),dtype= float)
+        self.setLane()

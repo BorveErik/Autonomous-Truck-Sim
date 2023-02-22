@@ -16,10 +16,12 @@ import pandas as pd
 
 def createFeatureMatrix(truck,traffic):
     Nveh = traffic.getDim()
-    features = np.zeros((5,1,Nveh+1))
+    features = np.zeros((8,1,Nveh+1))
     trafficFeatures = traffic.getFeatures()
     truckState = truck.getState()[:-1]
-    truckFeatures = np.array([np.append(truckState,np.array([[0]]))]).T
+    truckLane = np.array([[truck.getLane()]])
+    truckControl = truck.getControl()
+    truckFeatures = np.array([np.append(np.append(np.append(truckState,truckControl[0:]),np.array([[0]])),truckLane)]).T
     featureMap = np.append(truckFeatures,trafficFeatures,axis = 1)
     features[:,0,:] = featureMap
     return features
@@ -27,10 +29,12 @@ def createFeatureMatrix(truck,traffic):
 def features2CSV(X,Nveh,Nsim):
     # Creates data file with features from simulation
     Nvehp1 = Nveh + 1
-    X_2D = np.zeros((5,Nvehp1*Nsim))
+    X_2D = np.zeros((8,Nvehp1*Nsim))
     for i in range(Nsim):
         X_2D[:,i*Nvehp1:(i+1)*Nvehp1] = np.round(X[:,i,:],5)
     
+    print(X_2D.shape)
+
     DF = pd.DataFrame(X_2D)
     DF.to_csv('simData.csv',index=False,header=False)
 
