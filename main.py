@@ -150,7 +150,7 @@ traffic_state = np.zeros((5,N+1,Nveh))
 feature_map = np.zeros((8,Nsim*N_episodes,Nveh+1))
 i_crit = 0
 i_feature = 0
-# traffic.reset()
+traffic.reset()
 
 # # Episode iteration
 for j in range(0,N_episodes):
