@@ -70,7 +70,7 @@ def borvePictures(X,X_traffic,X_traffic_ref,vehList,X_pred,vehicle,scenario,traf
             plt.cla()
 
             # Plot Road
-            frameSize = 70
+            frameSize = 150
             X_road  = np.append(X[0,0:i_crit,0],X[0,i_crit,0]+frameSize)
             X_road  = np.append(X[0,0,0]-frameSize,X_road)
             plt.plot(X_road,np.ones((1,i_crit+2))[0]*roadMax/2,'--',color = 'r')

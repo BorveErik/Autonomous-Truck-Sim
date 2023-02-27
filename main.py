@@ -12,8 +12,8 @@ from helpers import *
 from templateRLagent import RLAgent
 
 # Set Gif-generation
-makeMovie = False
-directory = r"C:\Phd\Student_Projects\Stochastic-MPC-w-GNN\ACC_MPC_v2\simRes.gif"
+makeMovie = True
+directory = r"C:\Users\erikb\MyFiles\PhD\Student_Projects\Observer_w_MPC\Autonomous-Truck-Sim\simRes.gif"
 
 # System initialization 
 dt = 0.2                    # Simulation time step (Impacts traffic model accuracy)
@@ -24,8 +24,8 @@ ref_vx = 60/3.6             # Highway speed limit in (m/s)
 
 # -------------------------- Initilize RL agent object ----------------------------------
 # The agent is feed to the decision maker, changing names requries changing troughout code base
-N_episodes = 10            # Number of scenarios run created
-dist_max = 60              # Goal distance for the vehicle to travel. If reached, epsiode terminates
+N_episodes = 1            # Number of scenarios run created
+dist_max = 500              # Goal distance for the vehicle to travel. If reached, epsiode terminates
 
 RL_Agent = RLAgent()
 
@@ -65,14 +65,15 @@ vehicleADV.setInit([0,laneCenters[0]],vx_init_ego)
 vx_ref_init = 50/3.6                     # (m/s)
 advVeh1 = vehicleSUMO(dt,N,[30,laneCenters[1]],[0.9*vx_ref_init,0],type = "normal")
 advVeh2 = vehicleSUMO(dt,N,[45,laneCenters[0]],[0.8*vx_ref_init,0],type = "passive")
-advVeh3 = vehicleSUMO(dt,N,[100,laneCenters[2]],[0.85*vx_ref_init,0],type = "normal")
-advVeh4 = vehicleSUMO(dt,N,[-20,laneCenters[1]],[1.2*vx_ref_init,0],type = "aggressive")
+advVeh3 = vehicleSUMO(dt,N,[-65,laneCenters[2]],[0.85*vx_ref_init,0],type = "normal")
+advVeh4 = vehicleSUMO(dt,N,[130,laneCenters[1]],[1.4*vx_ref_init,0],type = "aggressive")
+
 advVeh5 = vehicleSUMO(dt,N,[40,laneCenters[2]],[1.2*vx_ref_init,0],type = "aggressive")
 advVeh6 = vehicleSUMO(dt,N,[-40,laneCenters[0]],[1.1*vx_ref_init,0],type = "aggressive")
 advVeh7 = vehicleSUMO(dt,N,[30,laneCenters[1]],[0.9*vx_ref_init,0],type = "normal")
 
 # # Combine choosen vehicles in list
-vehList = [advVeh1,advVeh2,advVeh3,advVeh4,advVeh5,advVeh6,advVeh7]
+vehList = [advVeh1,advVeh2,advVeh3,advVeh4]#,advVeh5,advVeh6,advVeh7]
 
 # # Define traffic object
 leadWidth, leadLength = advVeh1.getSize()
@@ -149,7 +150,7 @@ traffic_state = np.zeros((5,N+1,Nveh))
 feature_map = np.zeros((8,Nsim*N_episodes,Nveh+1))
 i_crit = 0
 i_feature = 0
-traffic.reset()
+# traffic.reset()
 
 # # Episode iteration
 for j in range(0,N_episodes):
@@ -213,7 +214,7 @@ for j in range(0,N_episodes):
             print('Simulation finished: Truck de-railed')
         else:
             i += 1
-
+        print("Iter:",i)
         traffic.tryRespawn(x_iter[0])
         X_traffic[:,i,:] = traffic.getStates()
         X_traffic_ref[:,i,:] = traffic.getReference()

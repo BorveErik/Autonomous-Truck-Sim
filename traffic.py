@@ -111,31 +111,54 @@ class combinedTraffic:
 
     def tryRespawn(self,egoPx):
         # Respawns vehicles that are "far enough" out of distance
+        dangerDist = 35
+        dangerTimeHeadway = 1
+        dangerVelocityDiff = 2
+
         for vehicle in self.vehicles:
             if vehicle.getState()[0] < egoPx - self.respawnTol:
-                # They also need to maintain atleast the same speed as the prior vehicle!
-                respawnPx = egoPx.full().item() +self.respawnPos + np.random.uniform(-self.randPxRange,self.randPxRange)
+                respawnPx = egoPx.full().item() + self.respawnPos + np.random.uniform(-self.randPxRange,self.randPxRange)
                 respawnVx = np.random.uniform(-self.randVxRange,self.randVxRange)
+                lane = np.random.randint(3)
+                respawnPy = vehicle.laneCenters[lane]
 
                 # Avoid instant collision with other vehicle when respawning
                 doRespawn = True
-                dangerDist = 35
-                dangerTimeHeadway = 1
-                dangerVelocityDiff = 2
                 vEgo = vehicle.getState()[2]
                 for otherVehicle in self.vehicles:
                     vOther = otherVehicle.getState()[2]
                     pxOther = otherVehicle.getState()[0]
-                    if type(pxOther) == "casadi.casadi.DM":
-                        pxOther = pxOther.full().astype("float")
+                    # if type(pxOther) == "casadi.casadi.DM":
+                    #     pxOther = pxOther.full().astype("float")
                     
                     dangerZone = dangerDist + dangerTimeHeadway*vOther + dangerVelocityDiff*(vOther-vEgo)
-                    if (dangerZone > np.abs(respawnPx - pxOther)) and (vehicle.getLane() == otherVehicle.getLane()):
+                    if (dangerZone > np.abs(respawnPx - pxOther)) and (lane == otherVehicle.getLane()):
                         doRespawn = False
                 
                 if doRespawn == True:
-                    vehicle.spawnVeh(respawnPx,respawnVx)
-            
+                    vehicle.spawnVeh(respawnPx,respawnPy,respawnVx)
+
+            elif vehicle.getState()[0] > egoPx + self.respawnPos+self.randPxRange:
+                respawnPx = egoPx.full().item() - self.respawnTol + np.random.uniform(0,self.randPxRange)
+                respawnVx = np.random.uniform(-self.randVxRange,self.randVxRange)
+                lane = np.random.randint(3)
+                respawnPy = vehicle.laneCenters[lane]
+
+                # Avoid instant collision with other vehicle when respawning
+                doRespawn = True
+                vEgo = vehicle.getState()[2]
+                for otherVehicle in self.vehicles:
+                    vOther = otherVehicle.getState()[2]
+                    pxOther = otherVehicle.getState()[0]
+                    # if type(pxOther) == "casadi.casadi.DM":
+                    #     pxOther = pxOther.full().astype("float")
+                    
+                    dangerZone = dangerDist + dangerTimeHeadway*vOther + dangerVelocityDiff*(vOther-vEgo)
+                    if (dangerZone > np.abs(respawnPx - pxOther)) and (lane == otherVehicle.getLane()):
+                        doRespawn = False
+                
+                if doRespawn == True:
+                    vehicle.spawnVeh(respawnPx,respawnPy,respawnVx)
 
 class vehicleSUMO:
     """
@@ -519,9 +542,10 @@ class vehicleSUMO:
     def getLane(self):
             return self.lane
 
-    def spawnVeh(self,respawnPx,respawnVx):
+    def spawnVeh(self,respawnPx,respawnPy,respawnVx):
         # Respawns the vehicle at given position and velocity
         self.p[0] = respawnPx
+        self.p[1] = respawnPy
         self.v = self.v + respawnVx
         self.theta = 0
         self.nearP = [self.p[0]+self.d_nearP, self.p[1]]
@@ -529,6 +553,7 @@ class vehicleSUMO:
         self.theta_n = 0
         self.theta_f = 0
         self.u = np.zeros((2,self.N),dtype= float)
+        self.setLane()
 
     def reInit(self,px,py,v):
         self.p[0] = px
